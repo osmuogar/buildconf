@@ -1,9 +1,5 @@
 #!/bin/bash
-VERSION=1.0.0
-
-# This ensures no disasters are produced if the script is called from another
-# directory
-actual_dir=$( cd "$( dirname "${BASH_SOURCE[0]}" )" > /dev/null && pwd )
+VERSION=1.0.1
 
 # Requested packages to configure this package
 requested_packages=(
@@ -51,7 +47,7 @@ function build {
         return 1
     fi
 
-    cd ${actual_dir}/ && autoreconf --install --force --warnings=all
+    autoreconf --install --force --warnings=all
 
 }
 
@@ -67,65 +63,67 @@ function clean {
     esac
 
     # Executables
-    rm -f ${actual_dir}/configure
-    rm -f ${actual_dir}/libtool
-    rm -f ${actual_dir}/src/main
-    rm -f ${actual_dir}/tests/test
+    rm -f configure
+    rm -f libtool
+    rm -f src/main
+    rm -f tests/test
 
     # Dirs
-    rm -rf ${actual_dir}/autom4te.cache/
-    rm -rf ${actual_dir}/aux-dist/
-    rm -rf ${actual_dir}/.vscode/
-    rm -rf ${actual_dir}/autom4te.cache/
+    rm -rf autom4te.cache/
+    rm -rf aux-dist/
+    rm -rf autom4te.cache/
+
+    # IDEs dirs
+    rm -rf .vscode/
 
     # M4 files
-    rm -f ${actual_dir}/m4/libtool.m4
-    rm -f ${actual_dir}/m4/lt~obsolete.m4
-    rm -f ${actual_dir}/m4/ltoptions.m4
-    rm -f ${actual_dir}/m4/ltsugar.m4
-    rm -f ${actual_dir}/m4/ltversion.m4
+    rm -f m4/libtool.m4
+    rm -f m4/lt~obsolete.m4
+    rm -f m4/ltoptions.m4
+    rm -f m4/ltsugar.m4
+    rm -f m4/ltversion.m4
 
     # Product directories
-    find ${actual_dir}/ -name "*.deps" -exec rm -r "{}" \;
-    find ${actual_dir}/ -name "*.libs" -exec rm -r "{}" \;
+    find . -name "*.deps" -exec rm -r "{}" \;
+    find . -name "*.libs" -exec rm -r "{}" \;
 
     # Product files
-    find ${actual_dir}/ -name "*.lo" -delete
-    find ${actual_dir}/ -name "*.la" -delete
-    find ${actual_dir}/ -name "*.o" -delete
-    find ${actual_dir}/ -name "*~" -delete
-    find ${actual_dir}/ -name "*.log" -delete
-    find ${actual_dir}/ -name "*.scan" -delete
+    find . -name "*.lo" -delete
+    find . -name "*.la" -delete
+    find . -name "*.o" -delete
+    find . -name "*~" -delete
+    find . -name "*.log" -delete
+    find . -name "*.scan" -delete
 
-    find ${actual_dir}/ -name "*.dirstamp" -delete
-    find ${actual_dir}/ -name "*.trs" -delete
+    find . -name "*.dirstamp" -delete
+    find . -name "*.trs" -delete
 
-    find ${actual_dir}/ -name "config.h*" -delete
-    find ${actual_dir}/ -name "stamp*" -delete
+    find . -name "config.h*" -delete
+    find . -name "stamp*" -delete
 
-    find ${actual_dir}/ -name "Makefile" -delete
-    find ${actual_dir}/ -name "Makefile.in" -delete
+    find . -name "Makefile" -delete
+    find . -name "Makefile.in" -delete
 
-    find ${actual_dir}/ -name "aclocal.m4" -delete
-    find ${actual_dir}/ -name "config.status" -delete
-    find ${actual_dir}/ -name "configure.scan" -delete
+    find . -name "aclocal.m4" -delete
+    find . -name "config.status" -delete
+    find . -name "configure.scan" -delete
 
     # Coverage files
-    find ${actual_dir}/ -name "missing" -delete
-    find ${actual_dir}/ -name "test-driver" -delete
-    find ${actual_dir}/ -name "ltmain.sh" -delete
-    find ${actual_dir}/ -name "install-sh" -delete
-    find ${actual_dir}/ -name "depcomp" -delete
-    find ${actual_dir}/ -name "config.sub" -delete
-    find ${actual_dir}/ -name "config.guess" -delete
-    find ${actual_dir}/ -name "compile" -delete
-    find ${actual_dir}/ -name "ar-lib" -delete
-    find ${actual_dir}/ -name "*.gco" -delete
-    find ${actual_dir}/ -name "*.gcno" -delete
-    find ${actual_dir}/ -name "*.gcda" -delete
+    find . -name "missing" -delete
+    find . -name "test-driver" -delete
+    find . -name "ltmain.sh" -delete
+    find . -name "install-sh" -delete
+    find . -name "depcomp" -delete
+    find . -name "config.sub" -delete
+    find . -name "config.guess" -delete
+    find . -name "compile" -delete
+    find . -name "ar-lib" -delete
+    find . -name "*.gco" -delete
+    find . -name "*.gcno" -delete
+    find . -name "*.gcda" -delete
 
     # Empty directories
-    find ${actual_dir}/ -type d -empty -delete
+    find . -type d -empty -delete
 
     return 0;
 
@@ -272,7 +270,7 @@ function version {
 # Main function
 function main {
 
-    if [ "$#" -eq 0 -o "$#" -gt 0  ] ; then  
+    if [ "$#" -eq 0 -o "$#" -gt 1  ] ; then  
         help;
         return 1;
     fi
