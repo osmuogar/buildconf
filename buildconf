@@ -1,0 +1,313 @@
+#!/bin/bash
+VERSION=1.0.0
+
+# This ensures no disasters are produced if the script is called from another
+# directory
+actual_dir=$( cd "$( dirname "${BASH_SOURCE[0]}" )" > /dev/null && pwd )
+
+# Requested packages to configure this package
+requested_packages=(
+    make # make 4.3
+    autoconf # autoconf 2.57
+    automake # automake 1.7
+    libtool # libtool 1.4.2
+    pkg-config # package config
+)
+
+# Checks if a package is installed in the system
+function installed_package {
+
+    dpkg -s $1 &>/dev/null;
+    if [ $? -ne 0 ]; then
+        return 1;
+    fi
+    return 0;
+
+}
+
+# Checks if the requested packages are installed
+function check_dependencies {
+
+    for index in "${!requested_packages[@]}" ; do
+        installed_package ${requested_packages[index]} > /dev/null;
+        if [ $? -ne 0 ] ; then
+            pending_installs="${pending_installs} ${requested_packages[index]}";
+        fi
+    done
+
+    if [ "${pending_installs}" != "" ] ; then
+        echo "The following packages are required:"${pending_installs};
+        return 1;
+    fi
+
+}
+
+# Tries to build the package
+function build {
+
+    check_dependencies;
+    if [ $? -ne 0 ] ; then
+        echo "There are required dependencies which should be installed."
+        return 1
+    fi
+
+    cd ${actual_dir}/ && autoreconf --install --force --warnings=all
+
+}
+
+# Cleans the produced files
+function clean {
+
+    # Validation
+    read -p "Remove all built files [y/N]? " yn
+    case $yn in
+    [yY]|[yY][eE][sS]);;
+    [nN]|[nN][oO] | * )
+        return 0;;
+    esac
+
+    # Executables
+    rm -f ${actual_dir}/configure
+    rm -f ${actual_dir}/libtool
+    rm -f ${actual_dir}/src/main
+    rm -f ${actual_dir}/tests/test
+
+    # Dirs
+    rm -rf ${actual_dir}/autom4te.cache/
+    rm -rf ${actual_dir}/aux-dist/
+    rm -rf ${actual_dir}/.vscode/
+    rm -rf ${actual_dir}/autom4te.cache/
+
+    # M4 files
+    rm -f ${actual_dir}/m4/libtool.m4
+    rm -f ${actual_dir}/m4/lt~obsolete.m4
+    rm -f ${actual_dir}/m4/ltoptions.m4
+    rm -f ${actual_dir}/m4/ltsugar.m4
+    rm -f ${actual_dir}/m4/ltversion.m4
+
+    # Product directories
+    find ${actual_dir}/ -name "*.deps" -exec rm -r "{}" \;
+    find ${actual_dir}/ -name "*.libs" -exec rm -r "{}" \;
+
+    # Product files
+    find ${actual_dir}/ -name "*.lo" -delete
+    find ${actual_dir}/ -name "*.la" -delete
+    find ${actual_dir}/ -name "*.o" -delete
+    find ${actual_dir}/ -name "*~" -delete
+    find ${actual_dir}/ -name "*.log" -delete
+    find ${actual_dir}/ -name "*.scan" -delete
+
+    find ${actual_dir}/ -name "*.dirstamp" -delete
+    find ${actual_dir}/ -name "*.trs" -delete
+
+    find ${actual_dir}/ -name "config.h*" -delete
+    find ${actual_dir}/ -name "stamp*" -delete
+
+    find ${actual_dir}/ -name "Makefile" -delete
+    find ${actual_dir}/ -name "Makefile.in" -delete
+
+    find ${actual_dir}/ -name "aclocal.m4" -delete
+    find ${actual_dir}/ -name "config.status" -delete
+    find ${actual_dir}/ -name "configure.scan" -delete
+
+    # Coverage files
+    find ${actual_dir}/ -name "missing" -delete
+    find ${actual_dir}/ -name "test-driver" -delete
+    find ${actual_dir}/ -name "ltmain.sh" -delete
+    find ${actual_dir}/ -name "install-sh" -delete
+    find ${actual_dir}/ -name "depcomp" -delete
+    find ${actual_dir}/ -name "config.sub" -delete
+    find ${actual_dir}/ -name "config.guess" -delete
+    find ${actual_dir}/ -name "compile" -delete
+    find ${actual_dir}/ -name "ar-lib" -delete
+    find ${actual_dir}/ -name "*.gco" -delete
+    find ${actual_dir}/ -name "*.gcno" -delete
+    find ${actual_dir}/ -name "*.gcda" -delete
+
+    # Empty directories
+    find ${actual_dir}/ -type d -empty -delete
+
+    return 0;
+
+}
+
+# Enables completion in the bash shell
+function completion {
+cat <<  EOF
+# bash completion for buildconf                             -*- shell-script -*-
+# If you want to install this file for all users it should be placed under
+# /etc/bash_completion.d/.
+# If you want it just for the current user place it under your \$HOME and
+# reference it with "source \$reference_to_file" in the .bash_profile file
+
+# This function provides the options for the top level
+function _buildconf_buildconf {
+    #case "\$prev" in
+		#--file|-f)
+			#_filedir "y?(a)ml"
+			#return
+			#;;
+		#--log-level)
+			#COMPREPLY=( \$( compgen -W "debug info warning error critical" -- "\$cur" ) )
+			#return
+			#;;
+	#esac
+
+	case "\$cur" in
+		-*)
+			COMPREPLY=( \$( compgen -W "\$boolean_options \$options_with_args" -- "\$cur" ) )
+			;;
+		*)
+			COMPREPLY=( \$( compgen -W "\${commands[*]}" -- "\$cur" ) )
+			;;
+	esac
+}
+
+# Main function which listens for arguments and redirects according to
+# subcomands
+function _buildconf {
+    # Obtains the actual extended globbing setting
+	local previous_extglob_setting=\$(shopt -p extglob)
+	shopt -s extglob # Enables extended globbing
+
+    # Top level commands
+	local commands=(
+		build
+		clean
+        completion
+        help
+	)
+
+	# Boolean options which are by default false.
+    #   Ex: --tls --verify-tls
+	local boolean_options="
+	"
+
+    # Options with arguments
+    #   Ex: --file -f --tlscert
+	local options_with_args="
+	"
+
+
+    COMPREPLY=()
+	local cur prev words cword
+
+    # From: https://github.com/GArik/bash-completion/blob/master/bash_completion
+    # Get the word to complete and optional previous words.
+    # This is nicer than \${COMP_WORDS[\$COMP_CWORD]}, since it handles cases
+    # where the user is completing in the middle of a word.
+    # (For example, if the line is "ls foobar",
+    # and the cursor is here -------->   ^
+    # Also one is able to cross over possible wordbreak characters.
+    # Usage: _get_comp_words_by_ref [OPTIONS] [VARNAMES]
+    # Available VARNAMES:
+    #     cur         Return cur via \$cur
+    #     prev        Return prev via \$prev
+    #     words       Return words via \$words
+    #     cword       Return cword via \$cword
+    #
+    # Available OPTIONS:
+    #     -n EXCLUDE  Characters out of \$COMP_WORDBREAKS which should NOT be
+    #                 considered word breaks. This is useful for things like scp
+    #                 where we want to return host:path and not only path, so we
+    #                 would pass the colon (:) as -n option in this case.
+    #     -c VARNAME  Return cur via \$VARNAME
+    #     -p VARNAME  Return prev via \$VARNAME
+    #     -w VARNAME  Return words via \$VARNAME
+    #     -i VARNAME  Return cword via \$VARNAME
+    #
+    # Example usage:
+    #
+    #    \$_get_comp_words_by_ref -n : cur prev
+    #
+	_get_comp_words_by_ref -n : cur prev words cword
+
+    #echo ""
+    #echo "current option is "\$cur
+    #echo "prev option is "\$prev
+    #echo "words option is "\$words
+    #echo "cwords option is "\$cword
+
+	# search subcommand and invoke its handler.
+	local command='buildconf'
+
+	local completions_func=_buildconf_\${command//-/_}
+	declare -F \$completions_func >/dev/null && \$completions_func
+
+	eval "\$previous_extglob_setting"
+	return 0
+
+}
+
+complete -F _buildconf buildconf
+EOF
+}
+
+
+# Help command text
+function help {
+
+    echo "Build or clean files in a repository handled by autotools";
+    echo "";
+    echo "Usage:";
+    echo "  buildconf [COMMAND]";
+    echo "  buildconf [OPTION]";
+    echo "";
+    echo "Options:";
+    echo "  -h|--help       Show this message"
+    echo "  -v|--version    Print version and exit"
+    echo "";
+    echo "Commands:";
+    echo "  build           Build config files in the repository";
+    echo "  clean           Clean files in the repository";
+    echo "  completion      Enables completion in the bash shell";
+
+}
+
+# Shows script version
+function version {
+    echo "  buildconf "${VERSION}
+}
+
+# Main function
+function main {
+
+    if [ "$#" -eq 0 -o "$#" -gt 0  ] ; then  
+        help;
+        return 1;
+    fi
+
+    while [ "$#" -ne 0 ] ; do
+        case $1 in
+        completion)
+            completion;
+            if [ $? -ne 0 ] ; then return $?; fi
+            ;;
+        clean)
+            clean;
+            if [ $? -ne 0 ] ; then return $?; fi
+            ;;
+        build)
+            build;
+            if [ $? -ne 0 ] ; then return $?; fi
+            ;;
+        -h|--help)
+            help;
+            if [ $? -ne 0 ] ; then return $?; fi
+            ;;
+        -v|--version)
+            version;
+            if [ $? -ne 0 ] ; then return $?; fi
+            ;;
+        *)
+            help;
+            return 1;;
+        esac;
+
+        shift;
+
+    done
+
+}
+
+main "$@"
